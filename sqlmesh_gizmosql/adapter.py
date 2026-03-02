@@ -4,6 +4,7 @@ GizmoSQL Engine Adapter for SQLMesh.
 GizmoSQL is a database server that uses DuckDB as its execution engine and
 exposes an Arrow Flight SQL interface for remote connections.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -68,10 +69,25 @@ class GizmoSQLEngineAdapter(
         return CatalogSupport.FULL_SUPPORT
 
     # DDL/DML keywords that need fetch to trigger GizmoSQL's lazy execution
-    _DDL_DML_KEYWORDS = frozenset({
-        "CREATE", "DROP", "ALTER", "TRUNCATE", "RENAME", "COMMENT", "USE", "SET",
-        "INSERT", "UPDATE", "DELETE", "MERGE", "COPY", "ATTACH", "DETACH",
-    })
+    _DDL_DML_KEYWORDS = frozenset(
+        {
+            "CREATE",
+            "DROP",
+            "ALTER",
+            "TRUNCATE",
+            "RENAME",
+            "COMMENT",
+            "USE",
+            "SET",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "MERGE",
+            "COPY",
+            "ATTACH",
+            "DETACH",
+        }
+    )
 
     def _execute(self, sql: str, track_rows_processed: bool = False, **kwargs: t.Any) -> None:
         """
@@ -102,10 +118,7 @@ class GizmoSQLEngineAdapter(
         methods, so we use explicit SQL statements (BEGIN TRANSACTION, COMMIT, ROLLBACK)
         for transaction control.
         """
-        if (
-            self._connection_pool.is_transaction_active
-            or (condition is not None and not condition)
-        ):
+        if self._connection_pool.is_transaction_active or (condition is not None and not condition):
             yield
             return
 
@@ -130,16 +143,12 @@ class GizmoSQLEngineAdapter(
 
     def _create_catalog(self, catalog_name: exp.Identifier) -> None:
         """Creates a new catalog (database) in GizmoSQL."""
-        self.execute(
-            exp.Create(this=exp.Table(this=catalog_name), kind="DATABASE", exists=True)
-        )
+        self.execute(exp.Create(this=exp.Table(this=catalog_name), kind="DATABASE", exists=True))
 
     def _drop_catalog(self, catalog_name: exp.Identifier) -> None:
         """Drops a catalog (database) from GizmoSQL."""
         self.execute(
-            exp.Drop(
-                this=exp.Table(this=catalog_name), kind="DATABASE", cascade=True, exists=True
-            )
+            exp.Drop(this=exp.Table(this=catalog_name), kind="DATABASE", cascade=True, exists=True)
         )
 
     def _ensure_schema_exists(self, table_name: TableName) -> None:

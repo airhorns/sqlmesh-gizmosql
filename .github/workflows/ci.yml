@@ -38,7 +38,7 @@ jobs:
         ports:
           - 31337:31337
         env:
-          GIZMOSQL_USERNAME: gizmosql_username
+          GIZMOSQL_USERNAME: gizmosql_user
           GIZMOSQL_PASSWORD: gizmosql_password
           DATABASE_FILENAME: /tmp/sqlmesh_test.duckdb
           TLS_ENABLED: "1"

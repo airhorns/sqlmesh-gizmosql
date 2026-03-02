@@ -26,7 +26,7 @@ def gizmosql_config() -> GizmoSQLConnectionConfig:
     Environment variables can override defaults:
     - GIZMOSQL_HOST: hostname (default: localhost)
     - GIZMOSQL_PORT: port (default: 31337)
-    - GIZMOSQL_USERNAME: username (default: gizmosql_username)
+    - GIZMOSQL_USERNAME: username (default: gizmosql_user)
     - GIZMOSQL_PASSWORD: password (default: gizmosql_password)
     """
     import os
@@ -34,7 +34,7 @@ def gizmosql_config() -> GizmoSQLConnectionConfig:
     return GizmoSQLConnectionConfig(
         host=os.environ.get("GIZMOSQL_HOST", "localhost"),
         port=int(os.environ.get("GIZMOSQL_PORT", "31337")),
-        username=os.environ.get("GIZMOSQL_USERNAME", "gizmosql_username"),
+        username=os.environ.get("GIZMOSQL_USERNAME", "gizmosql_user"),
         password=os.environ.get("GIZMOSQL_PASSWORD", "gizmosql_password"),
         use_encryption=True,
         disable_certificate_verification=True,
@@ -42,7 +42,9 @@ def gizmosql_config() -> GizmoSQLConnectionConfig:
 
 
 @pytest.fixture(scope="session")
-def gizmosql_adapter(gizmosql_config: GizmoSQLConnectionConfig) -> t.Generator[GizmoSQLEngineAdapter, None, None]:
+def gizmosql_adapter(
+    gizmosql_config: GizmoSQLConnectionConfig,
+) -> t.Generator[GizmoSQLEngineAdapter, None, None]:
     """Create a GizmoSQL engine adapter for testing."""
     adapter = gizmosql_config.create_engine_adapter()
     yield adapter
@@ -274,11 +276,13 @@ def test_dataframe_bulk_ingestion(gizmosql_adapter: GizmoSQLEngineAdapter):
         gizmosql_adapter.create_schema(schema_name)
 
         # Create a test DataFrame
-        df = pd.DataFrame({
-            "id": [1, 2, 3, 4, 5],
-            "name": ["alice", "bob", "charlie", "diana", "eve"],
-            "value": [10.5, 20.5, 30.5, 40.5, 50.5],
-        })
+        df = pd.DataFrame(
+            {
+                "id": [1, 2, 3, 4, 5],
+                "name": ["alice", "bob", "charlie", "diana", "eve"],
+                "value": [10.5, 20.5, 30.5, 40.5, 50.5],
+            }
+        )
 
         # Create target table
         columns_to_types = {
@@ -345,9 +349,7 @@ def test_create_table_in_nonexistent_schema(gizmosql_adapter: GizmoSQLEngineAdap
         assert result[0] == schema_name
 
         # Verify table exists and is usable
-        gizmosql_adapter.execute(
-            f"INSERT INTO {table_name} (id, name) VALUES (1, 'test')"
-        )
+        gizmosql_adapter.execute(f"INSERT INTO {table_name} (id, name) VALUES (1, 'test')")
         result = gizmosql_adapter.fetchone(f"SELECT * FROM {table_name}")
         assert result is not None
         assert result[0] == 1

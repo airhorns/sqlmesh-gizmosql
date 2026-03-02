@@ -25,10 +25,11 @@ Example config.yaml:
           password: pass
           database: my_database
 """
+
 from sqlmesh_gizmosql.adapter import GizmoSQLEngineAdapter
 from sqlmesh_gizmosql.connection import GizmoSQLConnectionConfig
 
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 __all__ = ["GizmoSQLEngineAdapter", "GizmoSQLConnectionConfig", "register", "__version__"]
 
 _registered = False
@@ -47,11 +48,13 @@ def register() -> None:
 
     # Register the engine adapter
     from sqlmesh.core import engine_adapter
+
     if "gizmosql" not in engine_adapter.DIALECT_TO_ENGINE_ADAPTER:
         engine_adapter.DIALECT_TO_ENGINE_ADAPTER["gizmosql"] = GizmoSQLEngineAdapter
 
     # Register the connection config
     from sqlmesh.core.config import connection as conn_module
+
     if "gizmosql" not in conn_module.CONNECTION_CONFIG_TO_TYPE:
         conn_module.CONNECTION_CONFIG_TO_TYPE["gizmosql"] = GizmoSQLConnectionConfig
 

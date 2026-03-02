@@ -29,7 +29,7 @@ def gizmosql_config() -> GizmoSQLConnectionConfig:
     Environment variables can override defaults:
     - GIZMOSQL_HOST: hostname (default: localhost)
     - GIZMOSQL_PORT: port (default: 31337)
-    - GIZMOSQL_USERNAME: username (default: gizmosql_username)
+    - GIZMOSQL_USERNAME: username (default: gizmosql_user)
     - GIZMOSQL_PASSWORD: password (default: gizmosql_password)
     """
     import os
@@ -37,7 +37,7 @@ def gizmosql_config() -> GizmoSQLConnectionConfig:
     return GizmoSQLConnectionConfig(
         host=os.environ.get("GIZMOSQL_HOST", "localhost"),
         port=int(os.environ.get("GIZMOSQL_PORT", "31337")),
-        username=os.environ.get("GIZMOSQL_USERNAME", "gizmosql_username"),
+        username=os.environ.get("GIZMOSQL_USERNAME", "gizmosql_user"),
         password=os.environ.get("GIZMOSQL_PASSWORD", "gizmosql_password"),
         use_encryption=True,
         disable_certificate_verification=True,
@@ -45,7 +45,9 @@ def gizmosql_config() -> GizmoSQLConnectionConfig:
 
 
 @pytest.fixture(scope="module")
-def gizmosql_adapter(gizmosql_config: GizmoSQLConnectionConfig) -> t.Generator[GizmoSQLEngineAdapter, None, None]:
+def gizmosql_adapter(
+    gizmosql_config: GizmoSQLConnectionConfig,
+) -> t.Generator[GizmoSQLEngineAdapter, None, None]:
     """Create a GizmoSQL engine adapter for testing."""
     adapter = gizmosql_config.create_engine_adapter()
     yield adapter
@@ -229,7 +231,9 @@ class TestDuckDBNonDefaultCatalog:
         finally:
             self._ensure_catalog_detached(gizmosql_adapter, catalog_name)
 
-    def test_auto_create_schema_in_non_default_catalog(self, gizmosql_adapter: GizmoSQLEngineAdapter):
+    def test_auto_create_schema_in_non_default_catalog(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter
+    ):
         """Test that create_table auto-creates schema in non-default catalog.
 
         This tests the scenario where SQLMesh tries to create a table like:
@@ -268,7 +272,9 @@ class TestDuckDBNonDefaultCatalog:
                 WHERE catalog_name = '{catalog_name}' AND schema_name = '{schema_name}'
                 """
             )
-            assert result is not None, "Schema should have been auto-created in the non-default catalog"
+            assert result is not None, (
+                "Schema should have been auto-created in the non-default catalog"
+            )
             assert result[0] == schema_name
 
             # Verify table is usable
@@ -280,7 +286,9 @@ class TestDuckDBNonDefaultCatalog:
         finally:
             self._ensure_catalog_detached(gizmosql_adapter, catalog_name)
 
-    def test_ctas_auto_create_schema_in_non_default_catalog(self, gizmosql_adapter: GizmoSQLEngineAdapter):
+    def test_ctas_auto_create_schema_in_non_default_catalog(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter
+    ):
         """Test that CTAS auto-creates schema in non-default catalog.
 
         This tests the exact scenario from the customer error:
@@ -342,7 +350,9 @@ class TestDuckLake:
     """Tests for DuckLake extension with PostgreSQL metadata storage."""
 
     @pytest.fixture(scope="class")
-    def ducklake_setup(self, gizmosql_adapter: GizmoSQLEngineAdapter) -> t.Generator[str, None, None]:
+    def ducklake_setup(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter
+    ) -> t.Generator[str, None, None]:
         """Setup DuckLake with PostgreSQL metadata backend."""
         import os
 
@@ -403,14 +413,18 @@ class TestDuckLake:
         catalog_names = [row[0] for row in result]
         assert ducklake_catalog in catalog_names
 
-    def test_create_schema_in_ducklake(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_create_schema_in_ducklake(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test creating a schema in the DuckLake catalog."""
         ducklake_catalog = ducklake_setup
         schema_name = "dl_test_schema"
 
         try:
             # Create schema in DuckLake catalog
-            gizmosql_adapter.execute(f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}")
+            gizmosql_adapter.execute(
+                f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}"
+            )
 
             # Verify it exists
             result = gizmosql_adapter.fetchone(
@@ -425,11 +439,15 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
-    def test_create_table_in_ducklake(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_create_table_in_ducklake(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test creating a table in the DuckLake catalog."""
         ducklake_catalog = ducklake_setup
         schema_name = "dl_table_schema"
@@ -437,7 +455,9 @@ class TestDuckLake:
 
         try:
             # Create schema
-            gizmosql_adapter.execute(f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}")
+            gizmosql_adapter.execute(
+                f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}"
+            )
 
             # Create table
             columns_to_types = {
@@ -460,7 +480,9 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
@@ -472,7 +494,9 @@ class TestDuckLake:
 
         try:
             # Create schema
-            gizmosql_adapter.execute(f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}")
+            gizmosql_adapter.execute(
+                f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}"
+            )
 
             # Use CTAS
             columns_to_types = {
@@ -493,11 +517,15 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
-    def test_table_exists_in_ducklake(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_table_exists_in_ducklake(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test checking if a table exists in DuckLake catalog."""
         ducklake_catalog = ducklake_setup
         schema_name = "dl_exists_schema"
@@ -505,7 +533,9 @@ class TestDuckLake:
 
         try:
             # Create schema
-            gizmosql_adapter.execute(f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}")
+            gizmosql_adapter.execute(
+                f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}"
+            )
 
             # Table should not exist yet
             assert not gizmosql_adapter.table_exists(exp.to_table(table_name))
@@ -519,11 +549,15 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
-    def test_switch_to_ducklake_catalog(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_switch_to_ducklake_catalog(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test switching to DuckLake catalog with USE statement."""
         ducklake_catalog = ducklake_setup
 
@@ -538,7 +572,9 @@ class TestDuckLake:
         # Switch back
         gizmosql_adapter.set_current_catalog(original_catalog)
 
-    def test_dataframe_bulk_ingestion_to_ducklake(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_dataframe_bulk_ingestion_to_ducklake(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test bulk DataFrame ingestion into a DuckLake table."""
         import pandas as pd
 
@@ -548,14 +584,18 @@ class TestDuckLake:
 
         try:
             # Create schema
-            gizmosql_adapter.execute(f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}")
+            gizmosql_adapter.execute(
+                f"CREATE SCHEMA IF NOT EXISTS {ducklake_catalog}.{schema_name}"
+            )
 
             # Create a test DataFrame
-            df = pd.DataFrame({
-                "id": [1, 2, 3, 4, 5],
-                "name": ["alice", "bob", "charlie", "diana", "eve"],
-                "score": [85.5, 92.0, 78.5, 95.0, 88.5],
-            })
+            df = pd.DataFrame(
+                {
+                    "id": [1, 2, 3, 4, 5],
+                    "name": ["alice", "bob", "charlie", "diana", "eve"],
+                    "score": [85.5, 92.0, 78.5, 95.0, 88.5],
+                }
+            )
 
             # Create target table
             columns_to_types = {
@@ -580,11 +620,15 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
-    def test_auto_create_schema_in_ducklake(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_auto_create_schema_in_ducklake(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test that create_table auto-creates schema in DuckLake catalog.
 
         This tests the exact customer scenario where SQLMesh tries to create:
@@ -598,7 +642,9 @@ class TestDuckLake:
         try:
             # Ensure schema does NOT exist
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
@@ -628,7 +674,9 @@ class TestDuckLake:
             assert result is not None, "Schema should have been auto-created in DuckLake catalog"
 
             # Verify table is usable
-            gizmosql_adapter.execute(f"INSERT INTO {table_name} (id, name) VALUES (1, 'ducklake_auto')")
+            gizmosql_adapter.execute(
+                f"INSERT INTO {table_name} (id, name) VALUES (1, 'ducklake_auto')"
+            )
             result = gizmosql_adapter.fetchone(f"SELECT * FROM {table_name}")
             assert result is not None
             assert result[0] == 1
@@ -636,11 +684,15 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
-    def test_ctas_auto_create_schema_in_ducklake(self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str):
+    def test_ctas_auto_create_schema_in_ducklake(
+        self, gizmosql_adapter: GizmoSQLEngineAdapter, ducklake_setup: str
+    ):
         """Test that CTAS auto-creates schema in DuckLake catalog.
 
         This is the exact error scenario from the customer:
@@ -654,7 +706,9 @@ class TestDuckLake:
         try:
             # Ensure schema does NOT exist
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
@@ -695,7 +749,9 @@ class TestDuckLake:
 
         finally:
             try:
-                gizmosql_adapter.execute(f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE")
+                gizmosql_adapter.execute(
+                    f"DROP SCHEMA IF EXISTS {ducklake_catalog}.{schema_name} CASCADE"
+                )
             except Exception:
                 pass
 
@@ -811,7 +867,9 @@ class TestCrossCatalogOperations:
             """)
 
             # Verify
-            result = gizmosql_adapter.fetchall(f"SELECT * FROM {catalog_b}.schema_b.target_data ORDER BY id")
+            result = gizmosql_adapter.fetchall(
+                f"SELECT * FROM {catalog_b}.schema_b.target_data ORDER BY id"
+            )
             assert len(result) == 2
             assert result[0][1] == "x"
             assert result[1][1] == "y"

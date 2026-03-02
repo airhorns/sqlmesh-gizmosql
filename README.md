@@ -15,7 +15,7 @@ A [SQLMesh](https://sqlmesh.com) engine adapter for [GizmoSQL](https://github.co
 pip install sqlmesh-gizmosql
 ```
 
-This will install `sqlmesh`, `adbc-driver-flightsql`, and `pyarrow` as dependencies.
+This will install `sqlmesh` and `adbc-driver-gizmosql` as dependencies.
 
 ## Usage
 
@@ -61,14 +61,30 @@ sqlmesh run
 |--------|------|---------|-------------|
 | `host` | str | `localhost` | GizmoSQL server hostname |
 | `port` | int | `31337` | GizmoSQL server port |
-| `username` | str | *required* | Authentication username |
-| `password` | str | *required* | Authentication password |
+| `username` | str | `None` | Authentication username (not needed with `auth_type: external`) |
+| `password` | str | `None` | Authentication password (not needed with `auth_type: external`) |
 | `database` | str | `None` | Default database/catalog |
 | `use_encryption` | bool | `True` | Use TLS encryption |
 | `disable_certificate_verification` | bool | `False` | Skip TLS cert verification |
+| `auth_type` | str | `None` | Authentication type (e.g., `external` for browser-based OAuth/SSO) |
 | `concurrent_tasks` | int | `4` | Max concurrent tasks |
 | `register_comments` | bool | `True` | Register model comments |
 | `pre_ping` | bool | `False` | Pre-ping connections |
+
+### OAuth/SSO Authentication
+
+GizmoSQL supports browser-based OAuth/SSO via `auth_type: external`. When using external auth, no username or password is needed — a browser window will open for authentication:
+
+```yaml
+gateways:
+  my_gizmosql:
+    connection:
+      type: gizmosql
+      host: gizmosql.example.com
+      port: 31337
+      auth_type: external
+      disable_certificate_verification: true  # for self-signed certs
+```
 
 ## Features
 

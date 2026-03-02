@@ -3,6 +3,7 @@ GizmoSQL Connection Configuration for SQLMesh.
 
 Provides the connection configuration class for GizmoSQL servers.
 """
+
 from __future__ import annotations
 
 import typing as t
@@ -18,19 +19,17 @@ from sqlmesh_gizmosql.adapter import GizmoSQLEngineAdapter
 
 
 def _gizmosql_import_validator(cls: t.Any, data: t.Any) -> t.Any:
-    """Validate that ADBC Flight SQL driver is installed."""
-    check_import = (
-        data.pop("check_import", True) if isinstance(data, dict) else True
-    )
+    """Validate that ADBC GizmoSQL driver is installed."""
+    check_import = data.pop("check_import", True) if isinstance(data, dict) else True
     if not check_import:
         return data
     try:
-        import adbc_driver_flightsql  # noqa: F401
+        import adbc_driver_gizmosql  # noqa: F401
     except ImportError:
         raise ConfigError(
-            "Failed to import the 'adbc_driver_flightsql' library. "
-            "Please install it with: pip install sqlmesh-gizmosql[gizmosql] "
-            "or pip install adbc-driver-flightsql pyarrow"
+            "Failed to import the 'adbc_driver_gizmosql' library. "
+            "Please install it with: pip install sqlmesh-gizmosql "
+            "or pip install adbc-driver-gizmosql"
         )
     return data
 
@@ -46,11 +45,12 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
     Args:
         host: The hostname of the GizmoSQL server.
         port: The port of the GizmoSQL server (default: 31337).
-        username: The username for authentication.
-        password: The password for authentication.
+        username: The username for authentication (not needed with auth_type="external").
+        password: The password for authentication (not needed with auth_type="external").
         use_encryption: Whether to use TLS encryption (default: True).
         disable_certificate_verification: Whether to skip TLS certificate verification.
             Useful for self-signed certificates in development (default: False).
+        auth_type: Authentication type (e.g., "external" for browser-based OAuth/SSO).
         database: The default database/catalog to use.
         concurrent_tasks: The maximum number of concurrent tasks.
         register_comments: Whether to register model comments.
@@ -59,10 +59,11 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
 
     host: str = "localhost"
     port: int = 31337
-    username: str
-    password: str
+    username: t.Optional[str] = None
+    password: t.Optional[str] = None
     use_encryption: bool = True
     disable_certificate_verification: bool = False
+    auth_type: t.Optional[str] = None
     database: t.Optional[str] = None
 
     concurrent_tasks: int = 4
@@ -89,33 +90,29 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
     @property
     def _connection_factory(self) -> t.Callable:
         """
-        Create a connection factory for GizmoSQL using ADBC Flight SQL driver.
+        Create a connection factory for GizmoSQL using adbc-driver-gizmosql.
 
         The connection is established using the Arrow Flight SQL protocol over gRPC.
         """
         import re
 
-        from adbc_driver_flightsql import DatabaseOptions
-        from adbc_driver_flightsql import dbapi as flightsql
+        from adbc_driver_gizmosql import connect as gizmosql_connect
 
         def connect() -> t.Any:
             # Build the URI for the Flight SQL connection
             protocol = "grpc+tls" if self.use_encryption else "grpc"
             uri = f"{protocol}://{self.host}:{self.port}"
 
-            # ADBC database-level options (passed to the driver)
-            db_kwargs: t.Dict[str, str] = {
-                "username": self.username,
-                "password": self.password,
-            }
-
-            # Add TLS skip verify option using the proper DatabaseOptions enum
+            connect_kwargs: t.Dict[str, t.Any] = {"uri": uri}
+            if self.auth_type:
+                connect_kwargs["auth_type"] = self.auth_type
+            if self.username:
+                connect_kwargs["username"] = self.username
+                connect_kwargs["password"] = self.password or ""
             if self.use_encryption and self.disable_certificate_verification:
-                db_kwargs[DatabaseOptions.TLS_SKIP_VERIFY.value] = "true"
+                connect_kwargs["tls_skip_verify"] = True
 
-            # Create the connection - uri is first positional arg, db_kwargs is for driver options
-            # Explicit autocommit=True since GizmoSQL doesn't support manual transaction commits
-            conn = flightsql.connect(uri, db_kwargs=db_kwargs, autocommit=True)
+            conn = gizmosql_connect(**connect_kwargs)
 
             # Verify the backend is DuckDB - this adapter only supports the DuckDB backend
             vendor_version = conn.adbc_get_info().get("vendor_version", "")

@@ -27,6 +27,7 @@ class TestGizmoSQLConnectionConfig:
         assert config.port == 31337
         assert config.use_encryption is True
         assert config.disable_certificate_verification is False
+        assert config.auth_type is None
         assert config.database is None
         assert config.concurrent_tasks == 4
 
@@ -51,6 +52,16 @@ class TestGizmoSQLConnectionConfig:
         assert config.disable_certificate_verification is True
         assert config.database == "mydb"
         assert config.concurrent_tasks == 8
+
+    def test_external_auth_no_credentials(self):
+        """Test that auth_type=external works without username/password."""
+        config = GizmoSQLConnectionConfig(
+            auth_type="external",
+        )
+
+        assert config.auth_type == "external"
+        assert config.username is None
+        assert config.password is None
 
     def test_dialect_is_duckdb(self):
         """Test that the dialect is set to duckdb."""
@@ -87,14 +98,10 @@ class TestGizmoSQLConnectionConfig:
 
     def test_connection_factory_builds_correct_uri_with_tls(self):
         """Test connection factory builds correct URI with TLS."""
-        mock_flightsql = MagicMock()
+        mock_connect = MagicMock()
         mock_conn = MagicMock()
         mock_conn.adbc_get_info.return_value = {"vendor_version": "duckdb v1.0.0"}
-        mock_flightsql.connect.return_value = mock_conn
-
-        # Mock DatabaseOptions enum
-        mock_db_options = MagicMock()
-        mock_db_options.TLS_SKIP_VERIFY.value = "adbc.flight.sql.client_option.tls_skip_verify"
+        mock_connect.return_value = mock_conn
 
         config = GizmoSQLConnectionConfig(
             host="example.com",
@@ -106,31 +113,24 @@ class TestGizmoSQLConnectionConfig:
         )
 
         mock_module = MagicMock()
-        mock_module.dbapi = mock_flightsql
-        mock_module.DatabaseOptions = mock_db_options
+        mock_module.connect = mock_connect
 
-        with patch.dict("sys.modules", {"adbc_driver_flightsql": mock_module}):
+        with patch.dict("sys.modules", {"adbc_driver_gizmosql": mock_module}):
             factory = config._connection_factory
             factory()
 
-        # Verify connect was called with correct URI (first positional arg)
-        call_args = mock_flightsql.connect.call_args
-        assert call_args[0][0] == "grpc+tls://example.com:31337"
-        # Verify db_kwargs contains credentials
-        db_kwargs = call_args[1]["db_kwargs"]
-        assert db_kwargs["username"] == "user"
-        assert db_kwargs["password"] == "pass"
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs["uri"] == "grpc+tls://example.com:31337"
+        assert call_kwargs["username"] == "user"
+        assert call_kwargs["password"] == "pass"
+        assert "tls_skip_verify" not in call_kwargs
 
     def test_connection_factory_builds_correct_uri_without_tls(self):
         """Test connection factory builds correct URI without TLS."""
-        mock_flightsql = MagicMock()
+        mock_connect = MagicMock()
         mock_conn = MagicMock()
         mock_conn.adbc_get_info.return_value = {"vendor_version": "duckdb v1.0.0"}
-        mock_flightsql.connect.return_value = mock_conn
-
-        # Mock DatabaseOptions enum
-        mock_db_options = MagicMock()
-        mock_db_options.TLS_SKIP_VERIFY.value = "adbc.flight.sql.client_option.tls_skip_verify"
+        mock_connect.return_value = mock_conn
 
         config = GizmoSQLConnectionConfig(
             host="example.com",
@@ -141,26 +141,72 @@ class TestGizmoSQLConnectionConfig:
         )
 
         mock_module = MagicMock()
-        mock_module.dbapi = mock_flightsql
-        mock_module.DatabaseOptions = mock_db_options
+        mock_module.connect = mock_connect
 
-        with patch.dict("sys.modules", {"adbc_driver_flightsql": mock_module}):
+        with patch.dict("sys.modules", {"adbc_driver_gizmosql": mock_module}):
             factory = config._connection_factory
             factory()
 
-        call_args = mock_flightsql.connect.call_args
-        assert call_args[0][0] == "grpc://example.com:31337"
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs["uri"] == "grpc://example.com:31337"
+
+    def test_connection_factory_with_tls_skip_verify(self):
+        """Test connection factory passes tls_skip_verify when configured."""
+        mock_connect = MagicMock()
+        mock_conn = MagicMock()
+        mock_conn.adbc_get_info.return_value = {"vendor_version": "duckdb v1.0.0"}
+        mock_connect.return_value = mock_conn
+
+        config = GizmoSQLConnectionConfig(
+            host="example.com",
+            port=31337,
+            username="user",
+            password="pass",
+            use_encryption=True,
+            disable_certificate_verification=True,
+        )
+
+        mock_module = MagicMock()
+        mock_module.connect = mock_connect
+
+        with patch.dict("sys.modules", {"adbc_driver_gizmosql": mock_module}):
+            factory = config._connection_factory
+            factory()
+
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs["tls_skip_verify"] is True
+
+    def test_connection_factory_with_auth_type(self):
+        """Test connection factory passes auth_type for OAuth/SSO."""
+        mock_connect = MagicMock()
+        mock_conn = MagicMock()
+        mock_conn.adbc_get_info.return_value = {"vendor_version": "duckdb v1.0.0"}
+        mock_connect.return_value = mock_conn
+
+        config = GizmoSQLConnectionConfig(
+            host="example.com",
+            port=31337,
+            auth_type="external",
+        )
+
+        mock_module = MagicMock()
+        mock_module.connect = mock_connect
+
+        with patch.dict("sys.modules", {"adbc_driver_gizmosql": mock_module}):
+            factory = config._connection_factory
+            factory()
+
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs["auth_type"] == "external"
+        assert "username" not in call_kwargs
+        assert "password" not in call_kwargs
 
     def test_connection_factory_rejects_non_duckdb_backend(self):
         """Test connection factory raises error for non-DuckDB backend."""
-        mock_flightsql = MagicMock()
+        mock_connect = MagicMock()
         mock_conn = MagicMock()
         mock_conn.adbc_get_info.return_value = {"vendor_version": "sqlite v3.40.0"}
-        mock_flightsql.connect.return_value = mock_conn
-
-        # Mock DatabaseOptions enum
-        mock_db_options = MagicMock()
-        mock_db_options.TLS_SKIP_VERIFY.value = "adbc.flight.sql.client_option.tls_skip_verify"
+        mock_connect.return_value = mock_conn
 
         config = GizmoSQLConnectionConfig(
             host="example.com",
@@ -170,10 +216,9 @@ class TestGizmoSQLConnectionConfig:
         )
 
         mock_module = MagicMock()
-        mock_module.dbapi = mock_flightsql
-        mock_module.DatabaseOptions = mock_db_options
+        mock_module.connect = mock_connect
 
-        with patch.dict("sys.modules", {"adbc_driver_flightsql": mock_module}):
+        with patch.dict("sys.modules", {"adbc_driver_gizmosql": mock_module}):
             factory = config._connection_factory
             with pytest.raises(ConfigError, match="Unsupported GizmoSQL server backend"):
                 factory()
