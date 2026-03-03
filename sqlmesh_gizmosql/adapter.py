@@ -8,6 +8,7 @@ exposes an Arrow Flight SQL interface for remote connections.
 from __future__ import annotations
 
 import contextlib
+import re
 import typing as t
 
 from sqlglot import exp
@@ -89,22 +90,31 @@ class GizmoSQLEngineAdapter(
         }
     )
 
+    # Regex to strip leading SQL block comments (e.g. /* SQLMESH_PLAN: ... */)
+    _SQL_COMMENT_RE = re.compile(r"^/\*.*?\*/\s*", re.DOTALL)
+
     def _execute(self, sql: str, track_rows_processed: bool = False, **kwargs: t.Any) -> None:
         """
         Execute a SQL statement.
 
         GizmoSQL uses lazy execution - statements are not actually executed
         until results are fetched. For DDL/DML statements, we call fetchall()
-        to ensure immediate execution. For SELECT queries, we let the caller
-        fetch the results.
+        to ensure immediate execution, then COMMIT to make changes visible
+        across all connections (GizmoSQL uses implicit transactions per connection).
         """
         self.cursor.execute(sql, **kwargs)
 
-        # For DDL/DML, fetch to trigger GizmoSQL's lazy execution
-        sql_upper = sql.strip().upper()
-        first_word = sql_upper.split()[0] if sql_upper else ""
+        # Strip leading block comments (e.g. /* SQLMESH_PLAN: <uuid> */) to find the real keyword
+        sql_stripped = self._SQL_COMMENT_RE.sub("", sql.strip()).upper()
+        first_word = sql_stripped.split()[0] if sql_stripped else ""
         if first_word in self._DDL_DML_KEYWORDS:
             self.cursor.fetchall()
+            # Auto-commit DDL/DML to make changes visible across connections.
+            try:
+                self.cursor.execute("COMMIT")
+                self.cursor.fetchall()
+            except Exception:
+                pass  # "no transaction active" is expected after some operations
 
     @contextlib.contextmanager
     def transaction(
@@ -112,29 +122,27 @@ class GizmoSQLEngineAdapter(
         condition: t.Optional[bool] = None,
     ) -> t.Iterator[None]:
         """
-        A transaction context manager using SQL statements.
+        A transaction context manager for GizmoSQL.
 
-        GizmoSQL's ADBC connection doesn't support the standard begin/commit/rollback
-        methods, so we use explicit SQL statements (BEGIN TRANSACTION, COMMIT, ROLLBACK)
-        for transaction control.
+        GizmoSQL ADBC connections use implicit transactions — each connection
+        automatically starts a transaction, and explicit BEGIN TRANSACTION fails
+        with "cannot start a transaction within a transaction".
+
+        Since we auto-commit all DDL/DML in _execute(), this method only manages
+        the connection pool's internal state tracking (for nesting detection).
+        No SQL transaction commands are sent.
         """
         if self._connection_pool.is_transaction_active or (condition is not None and not condition):
             yield
             return
 
         self._connection_pool.begin()
-        self.cursor.execute("BEGIN TRANSACTION")
-        self.cursor.fetchall()
         try:
             yield
         except Exception as e:
-            self.cursor.execute("ROLLBACK")
-            self.cursor.fetchall()
             self._connection_pool.rollback()
             raise e
         else:
-            self.cursor.execute("COMMIT")
-            self.cursor.fetchall()
             self._connection_pool.commit()
 
     def set_current_catalog(self, catalog: str) -> None:
