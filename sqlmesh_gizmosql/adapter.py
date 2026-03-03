@@ -278,8 +278,12 @@ class GizmoSQLEngineAdapter(
         catalog = self.get_current_catalog()
 
         if isinstance(schema_name, exp.Table):
-            # Ensures we don't generate identifier quotes
-            schema_name = ".".join(part.name for part in schema_name.parts)
+            # Use the catalog from the schema expression if provided
+            if schema_name.catalog:
+                catalog = schema_name.catalog
+            # Only use the db part (actual schema name) for the information_schema lookup.
+            # The catalog is already filtered separately in the WHERE clause.
+            schema_name = schema_name.db
 
         query = (
             exp.select(
