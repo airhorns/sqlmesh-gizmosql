@@ -65,6 +65,7 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
     disable_certificate_verification: bool = False
     auth_type: t.Optional[str] = None
     database: t.Optional[str] = None
+    connect_timeout: t.Optional[float] = None
 
     concurrent_tasks: int = 4
     register_comments: bool = True
@@ -111,6 +112,10 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
                 connect_kwargs["password"] = self.password or ""
             if self.use_encryption and self.disable_certificate_verification:
                 connect_kwargs["tls_skip_verify"] = True
+
+            if self.connect_timeout is not None:
+                connect_kwargs.setdefault("db_kwargs", {})
+                connect_kwargs["db_kwargs"]["adbc.flight.sql.rpc.timeout_seconds.connect"] = str(self.connect_timeout)
 
             conn = gizmosql.connect(**connect_kwargs)
 
