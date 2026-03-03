@@ -66,6 +66,7 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
     auth_type: t.Optional[str] = None
     database: t.Optional[str] = None
     connect_timeout: t.Optional[float] = None
+    max_msg_size: t.Optional[int] = None
 
     concurrent_tasks: int = 4
     register_comments: bool = True
@@ -113,9 +114,12 @@ class GizmoSQLConnectionConfig(ConnectionConfig):
             if self.use_encryption and self.disable_certificate_verification:
                 connect_kwargs["tls_skip_verify"] = True
 
-            if self.connect_timeout is not None:
+            if self.connect_timeout is not None or self.max_msg_size is not None:
                 connect_kwargs.setdefault("db_kwargs", {})
+            if self.connect_timeout is not None:
                 connect_kwargs["db_kwargs"]["adbc.flight.sql.rpc.timeout_seconds.connect"] = str(self.connect_timeout)
+            if self.max_msg_size is not None:
+                connect_kwargs["db_kwargs"]["adbc.flight.sql.client_option.with_max_msg_size"] = str(self.max_msg_size)
 
             conn = gizmosql.connect(**connect_kwargs)
 
