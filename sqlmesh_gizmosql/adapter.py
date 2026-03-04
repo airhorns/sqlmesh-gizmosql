@@ -181,7 +181,7 @@ class GizmoSQLEngineAdapter(
     def create_table(
         self,
         table_name: TableName,
-        columns_to_types: t.Dict[str, exp.DataType],
+        target_columns_to_types: t.Dict[str, exp.DataType],
         primary_key: t.Optional[t.Tuple[str, ...]] = None,
         exists: bool = True,
         table_description: t.Optional[str] = None,
@@ -194,7 +194,7 @@ class GizmoSQLEngineAdapter(
         self._ensure_schema_exists(table_name)
         super().create_table(
             table_name,
-            columns_to_types,
+            target_columns_to_types,
             primary_key=primary_key,
             exists=exists,
             table_description=table_description,
@@ -206,7 +206,7 @@ class GizmoSQLEngineAdapter(
         self,
         table_name: TableName,
         query_or_df: t.Union[exp.Expression, str, t.Any],
-        columns_to_types: t.Optional[t.Dict[str, exp.DataType]] = None,
+        target_columns_to_types: t.Optional[t.Dict[str, exp.DataType]] = None,
         exists: bool = True,
         table_description: t.Optional[str] = None,
         column_descriptions: t.Optional[t.Dict[str, str]] = None,
@@ -219,7 +219,7 @@ class GizmoSQLEngineAdapter(
         super().ctas(
             table_name,
             query_or_df,
-            columns_to_types=columns_to_types,
+            target_columns_to_types=target_columns_to_types,
             exists=exists,
             table_description=table_description,
             column_descriptions=column_descriptions,
